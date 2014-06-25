@@ -153,7 +153,7 @@ func LocateRcfile() (string, error) {
 	if currentUser == nil {
 		currentUser = user.Current
 	}
-	user, uErr := currentUser()
+	u, uErr := currentUser()
 
 	// Try dir supplied via env var
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
@@ -161,9 +161,9 @@ func LocateRcfile() (string, error) {
 		if err == nil {
 			return file, nil
 		}
-	} else if uErr == nil { // silently ignore failure for user.Current()
-		// Try "default" XDG location, is user is available
-		file, err := _locateRcfileIn(filepath.Join(user.HomeDir, ".config", "peco"))
+	} else if uErr == nil { // silently ignore failure for u.Current()
+		// Try "default" XDG location, is u is available
+		file, err := _locateRcfileIn(filepath.Join(u.HomeDir, ".config", "peco"))
 		if err == nil {
 			return file, nil
 		}
@@ -181,8 +181,8 @@ func LocateRcfile() (string, error) {
 		}
 	}
 
-	if uErr == nil { // silently ignore failure for user.Current()
-		file, err := _locateRcfileIn(filepath.Join(user.HomeDir, ".peco"))
+	if uErr == nil { // silently ignore failure for u.Current()
+		file, err := _locateRcfileIn(filepath.Join(u.HomeDir, ".peco"))
 		if err == nil {
 			return file, nil
 		}
