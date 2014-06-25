@@ -149,11 +149,13 @@ func LocateRcfile() (string, error) {
 	//	  $XDG_CONFIG_HOME/peco/config.json
 	//    $XDG_CONFIG_DIR/peco/config.json (where XDG_CONFIG_DIR is listed in $XDG_CONFIG_DIRS)
 	//	  ~/.peco/config.json
-
+	var u *user.User
+	var uErr error
 	if currentUser == nil {
-		currentUser = user.Current
+		u,uErr = user.Current()
+	} else {
+		u, uErr = currentUser()
 	}
-	u, uErr := currentUser()
 
 	// Try dir supplied via env var
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
