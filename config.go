@@ -11,7 +11,7 @@ import (
 	"github.com/nsf/termbox-go"
 )
 
-var currentUser = user.Current
+var currentUser func() (*user.User, error)
 
 type Config struct {
 	Keymap        Keymap   `json:"Keymap"`
@@ -150,6 +150,9 @@ func LocateRcfile() (string, error) {
 	//    $XDG_CONFIG_DIR/peco/config.json (where XDG_CONFIG_DIR is listed in $XDG_CONFIG_DIRS)
 	//	  ~/.peco/config.json
 
+	if currentUser == nil {
+		currentUser = user.Current
+	}
 	user, uErr := currentUser()
 
 	// Try dir supplied via env var

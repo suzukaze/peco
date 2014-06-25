@@ -33,7 +33,7 @@ type cmdOptions struct {
 	Help         bool   `short:"h" long:"help" description:"show this help message and exit"`
 	TTY          string `long:"tty" description:"path to the TTY (usually, the value of $TTY)"`
 	Query        string `long:"query"`
-	Rcfile       string `long:"rcfile" descriotion:"path to the settings file"`
+	Rcfile       string `long:"rcfile" description:"path to the settings file"`
 	NoIgnoreCase bool   `long:"no-ignore-case" description:"start in case-sensitive-mode" default:"false"`
 	Version      bool   `long:"version" description:"print the version and exit"`
 	ContextSep   bool   `long:"null" description:"expect NUL (\\0) as separator for target/output"`
