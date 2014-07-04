@@ -242,7 +242,7 @@ func (c *Ctx) NewFilter() *Filter {
 }
 
 func (c *Ctx) NewInput() *Input {
-	return &Input{c, &sync.Mutex{}, nil, c.config.Keymap, false}
+	return &Input{c, &sync.Mutex{}, nil, Keymap{}, false}
 }
 
 func (c *Ctx) Stop() {

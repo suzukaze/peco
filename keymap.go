@@ -16,12 +16,96 @@ const (
 	ModMax
 )
 
-// Keymap contains keys which are modifiers (like Alt+X), and points to
-// RawKeymap
-type Keymap [ModMax]RawKeymap
+// ActiveKeymap is the currently active keymap struct
+var ActiveKeymap Keymap
 
-// RawKeymap contains the actual mapping from termbox.Key to Action
-type RawKeymap map[termbox.Key]Action
+type KeyEvent struct {
+	termbox.Event
+	input *Input
+}
+
+type KeySeq struct {
+	key termbox.Key
+	mod int
+}
+
+type Keymap struct {
+	root    KeymapNodeWithMod
+	current *KeymapNodeWithMod
+}
+
+// action, err := ActiveKeymap.Current().Get(ev)
+// action.Execute(i, ev)
+func (m Keymap) Current() KeymapNodeWithMod {
+	if m.current == nil {
+		return m.root
+	}
+	return *m.current
+}
+
+func (m Keymap) IsChained() bool {
+	return m.current != nil
+}
+
+type KeymapNodeWithMod [ModMax]KeymapNode
+type KeymapNode map[termbox.Key]interface{}
+
+func (m KeymapNodeWithMod) GetItem(ev termbox.Event) (interface{}, error) {
+	modifier := ModNone
+	if (ev.Mod & termbox.ModAlt) != 0 {
+		modifier = ModAlt
+	}
+
+	// RawKeymap that we will be using
+	rkm := m[modifier]
+
+	switch modifier {
+	case ModAlt, ModNone:
+		var key termbox.Key
+		if ev.Ch == 0 {
+			key = ev.Key
+		} else {
+			key = termbox.Key(ev.Ch)
+		}
+
+		if i, ok := rkm[key]; ok {
+			return i, nil
+		}
+	default:
+		// Can't get here
+		return nil, fmt.Errorf("Invalid modifier")
+	}
+
+	return nil, fmt.Errorf("No matching item")
+}
+
+func (m KeymapNodeWithMod) GetAction(ev termbox.Event) Action {
+	item, err := m.GetItem(ev)
+	if err != nil {
+		if ActiveKeymap.IsChained() {
+			return ActionFunc(handleResetKeySequence)
+		}
+		return ActionFunc(handleAcceptChar)
+	}
+
+	switch item.(type) {
+	case KeymapNodeWithMod:
+		// XXX should fire a timer
+		return nil
+	case Action:
+		return item.(Action)
+	}
+	return nil
+}
+
+func (m KeymapNodeWithMod) HandleEvent(ev KeyEvent) {
+	action := m.GetAction(ev.Event)
+	if action == nil {
+		return
+	}
+
+	action.Execute(ev.input, ev.Event)
+}
 
 type KeymapStringKey string
 
@@ -137,8 +221,8 @@ func handleAcceptChar(i *Input, ev termbox.Event) {
 }
 
 func handleResetKeySequence(i *Input, ev termbox.Event) {
-	i.currentKeymap = i.config.Keymap
-	i.chained = false
+//	i.currentKeymap = i.config.Keymap
+//	i.chained = false
 }
 
 func (ksk KeymapStringKey) ToKey() (k termbox.Key, modifier int, err error) {
@@ -162,55 +246,20 @@ func (ksk KeymapStringKey) ToKey() (k termbox.Key, modifier int, err error) {
 }
 
 func NewKeymap() Keymap {
-	def := RawKeymap{}
+	def := KeymapNode{}
 	for k, v := range defaultKeyBinding {
 		def[k] = v
 	}
 	return Keymap{
-		def,
-		{},
+		KeymapNodeWithMod{
+			def,
+			KeymapNode{},
+		},
+		nil,
 	}
 }
 
-func (km Keymap) Handler(ev termbox.Event, chained bool) Action {
-	modifier := ModNone
-	if (ev.Mod & termbox.ModAlt) != 0 {
-		modifier = ModAlt
-	}
-
-	// RawKeymap that we will be using
-	rkm := km[modifier]
-
-	switch modifier {
-	case ModAlt:
-		var key termbox.Key
-		if ev.Ch == 0 {
-			key = ev.Key
-		} else {
-			key = termbox.Key(ev.Ch)
-		}
-
-		if h, ok := rkm[key]; ok {
-			return h
-		}
-	case ModNone:
-		if ev.Ch == 0 {
-			if h, ok := rkm[ev.Key]; ok {
-				return h
-			}
-		}
-	default:
-		panic("Can't get here")
-	}
-
-	if chained {
-		return ActionFunc(handleResetKeySequence)
-	} else {
-		return ActionFunc(handleAcceptChar)
-	}
-}
-
-func (km Keymap) UnmarshalJSON(buf []byte) error {
+func (km *Keymap) UnmarshalJSON(buf []byte) error {
 	raw := map[string]interface{}{}
 	if err := json.Unmarshal(buf, &raw); err != nil {
 		return err
@@ -220,15 +269,21 @@ func (km Keymap) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
-func (km Keymap) assignKeyHandlers(raw map[string]interface{}) {
+func (km *Keymap) assignKeyHandlers(raw map[string]interface{}) {
 	for ks, vi := range raw {
+fmt.Fprintf(os.Stderr, "ks = %v, vi = %v\n", ks, vi)
 		k, modifier, err := KeymapStringKey(ks).ToKey()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unknown key %s", ks)
 			continue
 		}
 
-		keymap := km[modifier]
+		keymap := km.root[modifier]
+		if keymap == nil {
+			keymap = KeymapNode{}
+			km.root[modifier] = keymap
+		}
+
 		switch vi.(type) {
 		case string:
 			vs := vi.(string)
@@ -237,6 +292,7 @@ func (km Keymap) assignKeyHandlers(raw map[string]interface{}) {
 				continue
 			}
 
+fmt.Fprintf(os.Stderr, "vi is a string\n")
 			v, ok := nameToActions[vs]
 			if !ok {
 				fmt.Fprintf(os.Stderr, "Unknown handler %s", vs)
@@ -249,7 +305,7 @@ func (km Keymap) assignKeyHandlers(raw map[string]interface{}) {
 				handleResetKeySequence(i, ev)
 			})
 		case map[string]interface{}:
-			ckm := Keymap{{}, {}}
+			ckm := Keymap{KeymapNodeWithMod{}, nil}
 			ckm.assignKeyHandlers(vi.(map[string]interface{}))
 			keymap[k] = ActionFunc(func(i *Input, _ termbox.Event) {
 				// Switch Keymap for chained state
@@ -261,5 +317,8 @@ func (km Keymap) assignKeyHandlers(raw map[string]interface{}) {
 }
 
 func (km Keymap) hasModifierMaps() bool {
-	return len(km[ModAlt]) > 0
+	current := km.Current()
+	return len(current[ModAlt]) > 0
 }
+
+// func (km Keymap) SetActionForSequence(a Action, keys ...KeySeq) error {

@@ -81,3 +81,15 @@ func TestSelection(t *testing.T) {
 		t.Errorf("expected Len = 1, got %d", s.Len())
 	}
 }
+
+/*
+func TestKeySequence(t *testing.T) {
+	km := &Keymap{KeymapNodeWithMod{}, nil}
+	called := 0
+	km.SetActionForSequence(ActionFunc(func(i *Input, e termbox.Event) {
+		called++
+	}), KeySeq{termbox.KeyCtrlX}, KeySeq{termbox.KeyCtrlC})
+
+	ev := termbox.Event{Key: termbox.KeyCtrlC}
+}
+*/

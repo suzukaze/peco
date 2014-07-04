@@ -13,15 +13,15 @@ import (
 var homedirFunc = homedir
 
 type Config struct {
-	Keymap        Keymap   `json:"Keymap"`
-	Matcher       string   `json:"Matcher"`
-	Style         StyleSet `json:"Style"`
+	Keymap        map[string]interface{} `json:"Keymap"`
+	Matcher       string                 `json:"Matcher"`
+	Style         StyleSet               `json:"Style"`
 	CustomMatcher map[string][]string
 }
 
 func NewConfig() *Config {
 	return &Config{
-		Keymap:  NewKeymap(),
+		Keymap:  map[string]interface{}{},
 		Matcher: IgnoreCaseMatch,
 		Style:   NewStyleSet(),
 	}
@@ -38,6 +38,10 @@ func (c *Config) ReadFilename(filename string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(os.Stderr, "%#q\n", ActiveKeymap)
+	ActiveKeymap.assignKeyHandlers(c.Keymap)
+	fmt.Fprintf(os.Stderr, "%#q\n", ActiveKeymap)
 
 	return nil
 }

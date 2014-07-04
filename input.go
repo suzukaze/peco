@@ -9,10 +9,10 @@ import (
 
 type Input struct {
 	*Ctx
-	mutex *sync.Mutex // Currently only used for protecting Alt/Esc workaround
-	mod *time.Timer
+	mutex         *sync.Mutex // Currently only used for protecting Alt/Esc workaround
+	mod           *time.Timer
 	currentKeymap Keymap
-	chained bool
+	chained       bool
 }
 
 func (i *Input) Loop() {
@@ -45,32 +45,33 @@ func (i *Input) Loop() {
 }
 
 func (i *Input) handleInputEvent(ev termbox.Event) {
-	hasModifierMaps := i.config.Keymap.hasModifierMaps()
+	hasModifierMaps := ActiveKeymap.hasModifierMaps()
 	switch ev.Type {
 	case termbox.EventError:
 		//update = false
 	case termbox.EventResize:
 		i.DrawMatches(nil)
 	case termbox.EventKey:
+		kev := KeyEvent{ev, i}
 		// ModAlt is a sequence of letters with a leading \x1b (=Esc).
 		// It would be nice if termbox differentiated this for us, but
 		// we workaround it by waiting (juuuuse a few milliseconds) for
 		// extra key events. If no extra events arrive, it should be Esc
 		if !hasModifierMaps {
-			i.handleKeyEvent(ev)
+			ActiveKeymap.Current().HandleEvent(kev)
 			return
 		}
 
 		// Smells like Esc or Alt. mod == nil checks for the presense
 		// of a previous timer
 		if ev.Ch == 0 && ev.Key == 27 && i.mod == nil {
-			tmp := ev
+			tmp := kev
 			i.mutex.Lock()
 			i.mod = time.AfterFunc(50*time.Millisecond, func() {
 				i.mutex.Lock()
 				i.mod = nil
 				i.mutex.Unlock()
-				i.handleKeyEvent(tmp)
+				ActiveKeymap.Current().HandleEvent(tmp)
 			})
 			i.mutex.Unlock()
 		} else {
@@ -83,14 +84,7 @@ func (i *Input) handleInputEvent(ev termbox.Event) {
 				ev.Mod |= ModAlt
 			}
 			i.mutex.Unlock()
-			i.handleKeyEvent(ev)
+			ActiveKeymap.Current().HandleEvent(kev)
 		}
-	}
-}
-
-func (i *Input) handleKeyEvent(ev termbox.Event) {
-	if h := i.currentKeymap.Handler(ev, i.chained); h != nil {
-		h.Execute(i, ev)
-		return
 	}
 }

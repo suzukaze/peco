@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
@@ -64,6 +65,10 @@ func main() {
 	var st int
 
 	defer func() { os.Exit(st) }()
+	defer func() {
+		b, _ := json.MarshalIndent(peco.ActiveKeymap, "", "    ")
+		fmt.Fprint(os.Stdout, string(b))
+	}()
 
 	if envvar := os.Getenv("GOMAXPROCS"); envvar == "" {
 		runtime.GOMAXPROCS(runtime.NumCPU())

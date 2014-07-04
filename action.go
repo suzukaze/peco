@@ -100,6 +100,8 @@ func init() {
 	ActionFunc(doSelectVisible).Register("SelectVisible")
 	ActionFunc(doToggleSelectMode).Register("ToggleSelectMode")
 	ActionFunc(doCancelSelectMode).Register("CancelSelectMode")
+
+	ActiveKeymap = NewKeymap()
 }
 
 func doRotateMatcher(i *Input, ev termbox.Event) {
